@@ -51,7 +51,7 @@ long readDistance() {
   digitalWrite(pingPin, LOW);
   
   pinMode(inPin, INPUT);
-  long duration = pulseIn(inPin, HIGH, 30000);
+  long duration = pulseIn(inPin, HIGH, 5000);
   long cm = duration / 58;
 
   // แสดงระยะทางใน Serial Monitor ตลอดเวลา

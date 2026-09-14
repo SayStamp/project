@@ -26,6 +26,10 @@ typedef struct _objects_t {
     lv_obj_t *space1_1;
     lv_obj_t *ledg;
     lv_obj_t *space1_2;
+    lv_obj_t *ledred;
+    lv_obj_t *space1_3;
+    lv_obj_t *ledgreen;
+    lv_obj_t *space1_4;
 } objects_t;
 
 extern objects_t objects;

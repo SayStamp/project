@@ -140,6 +140,69 @@ void create_screen_slide2() {
             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
             lv_label_set_text_static(obj, "Empty");
         }
+        {
+            lv_obj_t *obj = lv_label_create(parent_obj);
+            lv_obj_set_pos(obj, 27, 150);
+            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+            lv_label_set_text_static(obj, "Garage 2 : ");
+        }
+        {
+            // ledred
+            lv_obj_t *obj = lv_led_create(parent_obj);
+            objects.ledred = obj;
+            lv_obj_set_pos(obj, 130, 143);
+            lv_obj_set_size(obj, 32, 32);
+            lv_led_set_color(obj, lv_color_hex(0xff5200));
+            lv_led_set_brightness(obj, 255);
+        }
+        {
+            // space1_3
+            lv_obj_t *obj = lv_label_create(parent_obj);
+            objects.space1_3 = obj;
+            lv_obj_set_pos(obj, 128, 187);
+            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+            lv_label_set_text_static(obj, "FULL");
+        }
+        {
+            // ledgreen
+            lv_obj_t *obj = lv_led_create(parent_obj);
+            objects.ledgreen = obj;
+            lv_obj_set_pos(obj, 202, 143);
+            lv_obj_set_size(obj, 32, 32);
+            lv_led_set_color(obj, lv_color_hex(0x0eff00));
+            lv_led_set_brightness(obj, 255);
+        }
+        {
+            // space1_4
+            lv_obj_t *obj = lv_label_create(parent_obj);
+            objects.space1_4 = obj;
+            lv_obj_set_pos(obj, 194, 188);
+            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+            lv_label_set_text_static(obj, "Empty");
+        }
+        {
+            lv_obj_t *obj = lv_img_create(parent_obj);
+            lv_obj_set_pos(obj, 27, 89);
+            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+            lv_img_set_src(obj, &img_car);
+            lv_img_set_pivot(obj, 0, 0);
+            lv_img_set_zoom(obj, 146);
+        }
+        {
+            lv_obj_t *obj = lv_img_create(parent_obj);
+            lv_obj_set_pos(obj, 242, -10);
+            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+            lv_img_set_src(obj, &img_gar);
+            lv_img_set_pivot(obj, 0, 0);
+            lv_img_set_zoom(obj, 146);
+        }
+        {
+            lv_obj_t *obj = lv_img_create(parent_obj);
+            lv_obj_set_pos(obj, -15, 118);
+            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+            lv_img_set_src(obj, &img_car2);
+            lv_img_set_zoom(obj, 99);
+        }
     }
     
     tick_screen_slide2();

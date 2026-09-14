@@ -59,7 +59,7 @@ Arduino_GFX *gfx = create_default_Arduino_GFX();
 
 #define GFX_BL 32
 Arduino_DataBus *bus = new Arduino_ESP32SPI(2, 15, 18, 23, GFX_NOT_DEFINED);
-Arduino_GFX *gfx = new Arduino_ILI9342        (bus, 4, 1 /* rotation */, false /* IPS */);
+Arduino_GFX *gfx = new Arduino_ILI9342        (bus, 4, 1 /* rotation */, true /* IPS */);
 #define CANVAS
 
 
@@ -129,10 +129,10 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 const int pingPin = 5; 
 int inPin = 13;        
 int ledPin = 25;       
-int digitalPin = 32;   
+int digitalPin = 33;   
 int val = 0;
-int buzzer = 22;       
-
+int buzzer = 14;       
+int digitalPin2 = 16;
 int servoPin = 26;     
 // ---------------------------------------------------
 
@@ -143,7 +143,7 @@ const int CLOSED_ANGLE = 90;
 bool isDoorOpen = true; 
 
 // ----------------- ตั้งค่าระยะห่างของรถ -----------------
-const int DISTANCE_THRESHOLD = 30; 
+const int DISTANCE_THRESHOLD = 20; 
 // ----------------------------------------------------
 
 // ----------------- ระบบรหัสผ่าน 3 แบบและเวลา -----------------
@@ -154,57 +154,116 @@ unsigned long doorOpenTime = 0;
 const unsigned long autoCloseDelay = 3000; 
 // --------------------------------------------------------
 // ฟังก์ชันนี้จะทำงานเมื่อมีการพิมพ์รหัสและกดปุ่ม ENTER บนจอ
-void ui_password_event_cb(lv_event_t * e) {
-  lv_event_code_t code = lv_event_get_code(e);
-  lv_obj_t * ta = lv_event_get_target(e); // ตัว Text Area ที่เกิด Event
+// ฟังก์ชันควบคุมปุ่มตัวเลข
+void ui_password_event_cb(lv_event_t * e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
 
-  // ถ้า Event คือการกดปุ่ม ENTER (READY)
-  if(code == LV_EVENT_READY) { 
-    // 1. ดึงข้อความจาก Text Area มาเก็บไว้
-    const char * txt = lv_textarea_get_text(ta);
-    String inputCode = String(txt);
+    if (code != LV_EVENT_VALUE_CHANGED)
+        return;
 
-    // 2. นำไปเช็คกับรหัสผ่านที่ตั้งไว้
-    bool isPasswordCorrect = false;
-    for (int i = 0; i < numPasswords; i++) {
-      if (inputCode == savedPasswords[i]) {
-        isPasswordCorrect = true;
-        break; 
-      }
+    lv_obj_t *btnmatrix = lv_event_get_target(e);
+
+    // หาว่ากดปุ่มไหน
+    uint16_t id = lv_btnmatrix_get_selected_btn(btnmatrix);
+
+    // อ่านข้อความของปุ่มที่กด
+    const char *btnText = lv_btnmatrix_get_btn_text(btnmatrix, id);
+
+    if (btnText == NULL)
+        return;
+
+    Serial.print("Button: ");
+    Serial.println(btnText);
+
+    // -------------------------
+    // ถ้ากดตัวเลข
+    // -------------------------
+    if ((btnText[0] >= '0' && btnText[0] <= '9') && btnText[1] == '\0')
+    {
+        // ดึงข้อความปัจจุบันในช่อง
+        const char *oldText = lv_textarea_get_text(objects.enterpass);
+
+        String newText = String(oldText) + String(btnText);
+
+        // ใส่ตัวเลขลง TextArea
+        lv_textarea_set_text(objects.enterpass, newText.c_str());
     }
 
-    // 3. เงื่อนไขเมื่อรหัสถูกหรือผิด
-    if (isPasswordCorrect) {
-      Serial.println("UI: Password Correct! Access Granted.");
-      
-      // สั่งเปิดประตู (ดึงฟังก์ชันมาจาก sensor.cpp)
-      openDoor();               
-      doorOpenTime = millis(); 
+    // -------------------------
+    // ถ้ากด CLEAR
+    // -------------------------
+    else if (strcmp(btnText, "CLEAR") == 0)
+    {
+        lv_textarea_set_text(objects.enterpass, "");
 
-      // เคลียร์รหัสผ่านทิ้งเพื่อความปลอดภัย
-      lv_textarea_set_text(ta, ""); 
-
-      // ************ คำสั่งเปลี่ยนหน้าจอ ************
-      // เปลี่ยน ui_Screen2 เป็นชื่อหน้าจอถัดไปที่คุณตั้งไว้ใน EEZ Studio
-      loadScreen(SCREEN_ID_SLIDE2); 
-      // *****************************************
-      
-    } else {
-      Serial.println("UI: Wrong Password! Access Denied.");
-      // ถ้าผิด ให้ล้างช่องรหัสผ่านให้กรอกใหม่
-      lv_textarea_set_text(ta, "");
+        Serial.println("Password Cleared");
     }
-  }
+
+    // -------------------------
+    // ถ้ากด ENTER
+    // -------------------------
+    else if (strcmp(btnText, "ENTER") == 0)
+    {
+        const char *txt = lv_textarea_get_text(objects.enterpass);
+
+        String inputCode = String(txt);
+
+        Serial.print("Entered Code: ");
+        Serial.println(inputCode);
+
+        // ตรวจสอบรหัส
+        bool isPasswordCorrect = false;
+
+        for (int i = 0; i < numPasswords; i++)
+        {
+            if (inputCode == savedPasswords[i])
+            {
+                isPasswordCorrect = true;
+                break;
+            }
+        }
+
+        // -------------------------
+        // รหัสถูก
+        // -------------------------
+        if (isPasswordCorrect)
+        {
+            Serial.println("UI: Password Correct!");
+
+            // เปิดประตู
+            openDoor();
+            doorOpenTime = millis();
+
+            // ล้างช่องรหัส
+            lv_textarea_set_text(objects.enterpass, "");
+
+            // เปลี่ยนไปหน้าถัดไป
+            loadScreen(SCREEN_ID_SLIDE2);
+        }
+
+        // -------------------------
+        // รหัสผิด
+        // -------------------------
+        else
+        {
+            Serial.println("UI: Wrong Password!");
+
+            // ล้างรหัสเพื่อกรอกใหม่
+            lv_textarea_set_text(objects.enterpass, "");
+        }
+    }
 }
 
 void setup()
 {
-  Serial.begin(115200);
-  setupSensors();
-  // Serial.setDebugOutput(true);
-  // while(!Serial);
-  Serial.println("Arduino_GFX LVGL Widgets example");
+    Serial.begin(115200);
 
+    setupSensors();
+
+    pinMode(digitalPin2, INPUT);
+
+    Serial.println("Arduino_GFX LVGL Widgets example");
 #ifdef GFX_EXTRA_PRE_INIT
   GFX_EXTRA_PRE_INIT();
 #endif
@@ -288,11 +347,17 @@ void setup()
 //    gfx->flush();
 //    //delay(1000);
     
-    ui_init();
+ui_init();
 
-    Serial.println("Setup done");
-    lv_obj_add_event_cb(objects.enterpass, ui_password_event_cb, LV_EVENT_READY, NULL);
-    lv_keyboard_set_textarea(objects.botton, objects.enterpass);
+Serial.println("Setup done");
+
+// รับ Event จาก ButtonMatrix
+lv_obj_add_event_cb(
+    objects.botton,
+    ui_password_event_cb,
+    LV_EVENT_VALUE_CHANGED,
+    NULL
+);
   }
 }
 
@@ -310,16 +375,41 @@ void loop()
   // 5. ตรวจสอบการปิดประตูอัตโนมัติ
   checkAutoClose();  
   lv_timer_handler(); /* let the GUI do its work */
-  // ถ้าระยะเซ็นเซอร์น้อยกว่าที่กำหนด (มีรถจอด = FULL)
-if (currentDistance > 0 && currentDistance <= DISTANCE_THRESHOLD) {
-    lv_obj_clear_flag(objects.ledg, LV_OBJ_FLAG_HIDDEN);  // โชว์ไฟแดง
-    lv_obj_add_flag(objects.ledr, LV_OBJ_FLAG_HIDDEN);  // ซ่อนไฟเขียว
-} 
-// ถ้าไม่มีรถจอด (Empty)
-else {
-    lv_obj_add_flag(objects.ledg, LV_OBJ_FLAG_HIDDEN);    // ซ่อนไฟแดง
-    lv_obj_clear_flag(objects.ledr, LV_OBJ_FLAG_HIDDEN);// โชว์ไฟเขียว
-}
+
+  // อ่านค่าจากพิน IR ทั้ง 2 ตัว
+  int irValue = digitalRead(digitalPin); 
+  int irValue2 = digitalRead(digitalPin2); 
+
+  // แสดงค่าออกทาง Serial Monitor เพื่อตรวจสอบ
+  Serial.print("Distance: ");
+  Serial.print(currentDistance);
+  Serial.print(" | digitalPin (Garage 1): ");
+  Serial.print(irValue);
+  Serial.print(" | digitalPin2 (Garage 2): ");
+  Serial.println(irValue2);
+
+  // ถ้าเจอรถ (IR เป็น HIGH) หรือถ้าระยะอยู่ในเกณฑ์ (Garage 1)
+  if (irValue == 1 ) {
+      lv_obj_clear_flag(objects.ledg, LV_OBJ_FLAG_HIDDEN);  // โชว์ไฟแดง (ledg)
+      lv_obj_add_flag(objects.ledr, LV_OBJ_FLAG_HIDDEN);    // ซ่อนไฟเขียว (ledr)
+  } 
+  // ถ้าไม่มีรถ (IR เป็น LOW)
+  else {
+      lv_obj_add_flag(objects.ledg, LV_OBJ_FLAG_HIDDEN);    // ซ่อนไฟแดง
+      lv_obj_clear_flag(objects.ledr, LV_OBJ_FLAG_HIDDEN);  // โชว์ไฟเขียว
+  }
+
+  // ถ้าเจอรถ (IR เป็น HIGH) หรือถ้าระยะอยู่ในเกณฑ์ (Garage 2)
+  if (irValue2 == 1) {
+      lv_obj_clear_flag(objects.ledgreen, LV_OBJ_FLAG_HIDDEN);  // โชว์ไฟแดง 
+      lv_obj_add_flag(objects.ledred, LV_OBJ_FLAG_HIDDEN);      // ซ่อนไฟเขียว 
+  } 
+  // ถ้าไม่มีรถ (IR เป็น LOW)
+  else {
+      lv_obj_add_flag(objects.ledgreen, LV_OBJ_FLAG_HIDDEN);    // ซ่อนไฟแดง
+      lv_obj_clear_flag(objects.ledred, LV_OBJ_FLAG_HIDDEN);    // โชว์ไฟเขียว
+  }
+
 #ifdef DIRECT_MODE
 #if (LV_COLOR_16_SWAP != 0)
   gfx->draw16bitBeRGBBitmap(0, 0, (uint16_t *)disp_draw_buf, screenWidth, screenHeight);

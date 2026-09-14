@@ -11,13 +11,13 @@ extern "C" {
 
 enum ScreensEnum {
     _SCREEN_ID_FIRST = 1,
-    SCREEN_ID_MAIN = 1,
+    SCREEN_ID_SLIDE1 = 1,
     SCREEN_ID_SLIDE2 = 2,
     _SCREEN_ID_LAST = 2
 };
 
 typedef struct _objects_t {
-    lv_obj_t *main;
+    lv_obj_t *slide1;
     lv_obj_t *slide2;
     lv_obj_t *botton;
     lv_obj_t *enterpass;
@@ -30,12 +30,13 @@ typedef struct _objects_t {
     lv_obj_t *space1_3;
     lv_obj_t *ledgreen;
     lv_obj_t *space1_4;
+    lv_obj_t *backbt;
 } objects_t;
 
 extern objects_t objects;
 
-void create_screen_main();
-void tick_screen_main();
+void create_screen_slide1();
+void tick_screen_slide1();
 
 void create_screen_slide2();
 void tick_screen_slide2();

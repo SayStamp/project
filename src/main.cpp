@@ -127,13 +127,13 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 
 // ------------ ประกาศสร้างตัวแปรทั้งหมด ------------
 const int pingPin = 5; 
-int inPin = 13;        
-int ledPin = 25;       
+int inPin = 13;             
 int digitalPin = 33;   
-int val = 0;
-int buzzer = 14;       
+int val = 0;      
 int digitalPin2 = 16;
 int servoPin = 26;     
+int buzzer = 14;
+int ledPin = 25;
 // ---------------------------------------------------
 
 Servo doorServo;
@@ -143,6 +143,7 @@ const int CLOSED_ANGLE = 90;
 bool isDoorOpen = true; 
 
 // ----------------- ตั้งค่าระยะห่างของรถ -----------------
+long globalDistance = 0;
 const int DISTANCE_THRESHOLD = 20; 
 // ----------------------------------------------------
 
@@ -193,10 +194,9 @@ void ui_password_event_cb(lv_event_t * e)
     // -------------------------
     // ถ้ากด CLEAR
     // -------------------------
-    else if (strcmp(btnText, "CLEAR") == 0)
+    else if (strcmp(btnText, "CLEAR") == 0) 
     {
         lv_textarea_set_text(objects.enterpass, "");
-
         Serial.println("Password Cleared");
     }
 
@@ -227,20 +227,31 @@ void ui_password_event_cb(lv_event_t * e)
         // -------------------------
         // รหัสถูก
         // -------------------------
-        if (isPasswordCorrect)
-        {
-            Serial.println("UI: Password Correct!");
+if (isPasswordCorrect)
+    {
+        Serial.println("UI: Password Correct!");
 
-            // เปิดประตู
+        // 1. ล้างรหัส และ เปลี่ยนหน้าจอทันทีที่รหัสถูก
+        lv_textarea_set_text(objects.enterpass, "");
+        loadScreen(SCREEN_ID_SLIDE2);
+
+        // 2. ค่อยมาเช็คเซ็นเซอร์ว่าต้องเปิดประตูด้วยไหม
+        long distance = readDistance();
+        Serial.print("Car distance: ");
+        Serial.print(distance);
+        Serial.println(" cm");
+
+        if (true)
+        {
+            Serial.println("Car detected! Opening door...");
             openDoor();
             doorOpenTime = millis();
-
-            // ล้างช่องรหัส
-            lv_textarea_set_text(objects.enterpass, "");
-
-            // เปลี่ยนไปหน้าถัดไป
-            loadScreen(SCREEN_ID_SLIDE2);
         }
+        else
+        {
+            Serial.println("No car detected! Door will NOT open.");
+        }
+    }
 
         // -------------------------
         // รหัสผิด
@@ -252,9 +263,21 @@ void ui_password_event_cb(lv_event_t * e)
             // ล้างรหัสเพื่อกรอกใหม่
             lv_textarea_set_text(objects.enterpass, "");
         }
+      }
+      }
+  void ui_back_event_cb(lv_event_t * e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    if(code == LV_EVENT_CLICKED) {
+        Serial.println("UI: Back button clicked!");
+        
+        // ล้างช่องใส่รหัสผ่านให้ว่างก่อนกลับหน้าแรก
+        lv_textarea_set_text(objects.enterpass, "");
+        
+        // สั่งโหลดกลับไปหน้าแรก (สมมติว่าหน้าแรกชื่อ SCREEN_ID_SLIDE1)
+        loadScreen(SCREEN_ID_SLIDE1); 
     }
 }
-
 void setup()
 {
     Serial.begin(115200);
@@ -358,19 +381,25 @@ lv_obj_add_event_cb(
     LV_EVENT_VALUE_CHANGED,
     NULL
 );
+lv_obj_add_event_cb(
+    objects.backbt,
+    ui_back_event_cb,          // <--- แก้ให้เรียกฟังก์ชัน Back
+    LV_EVENT_CLICKED,          // <--- แก้เป็น Event การคลิก
+    NULL
+);
   }
 }
 
 void loop()
 {
   // 1 & 2. การอ่านค่าระยะทางจากเซ็นเซอร์และอัพเดทเวลารถขวาง
-  long currentDistance = readDistance();
+  globalDistance = readDistance(); 
 
   // 3. อ่านค่าเซ็นเซอร์เคลื่อนไหว ควบคุมไฟ LED
   handleMotionSensor();
 
   // 4. ส่วนตรวจสอบรหัสผ่าน (ส่งค่าระยะทางไปเช็คเงื่อนไขด้วย)
-  checkPasswordSystem(currentDistance);
+  checkPasswordSystem(globalDistance);
   
   // 5. ตรวจสอบการปิดประตูอัตโนมัติ
   checkAutoClose();  
@@ -382,12 +411,11 @@ void loop()
 
   // แสดงค่าออกทาง Serial Monitor เพื่อตรวจสอบ
   Serial.print("Distance: ");
-  Serial.print(currentDistance);
+  Serial.print(globalDistance);
   Serial.print(" | digitalPin (Garage 1): ");
   Serial.print(irValue);
   Serial.print(" | digitalPin2 (Garage 2): ");
   Serial.println(irValue2);
-
   // ถ้าเจอรถ (IR เป็น HIGH) หรือถ้าระยะอยู่ในเกณฑ์ (Garage 1)
   if (irValue == 1 ) {
       lv_obj_clear_flag(objects.ledg, LV_OBJ_FLAG_HIDDEN);  // โชว์ไฟแดง (ledg)
@@ -422,5 +450,5 @@ void loop()
   gfx->flush();
 #endif
 
-  delay(1000);
+  delay(500);
 }

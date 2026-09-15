@@ -138,8 +138,8 @@ int ledPin = 25;
 
 Servo doorServo;
 
-const int OPEN_ANGLE   = 0;
-const int CLOSED_ANGLE = 90;
+const int OPEN_ANGLE   =0;
+const int CLOSED_ANGLE = 120;
 bool isDoorOpen = true; 
 
 // ----------------- ตั้งค่าระยะห่างของรถ -----------------
@@ -149,10 +149,10 @@ const int DISTANCE_THRESHOLD = 20;
 
 // ----------------- ระบบรหัสผ่าน 3 แบบและเวลา -----------------
 const int numPasswords = 3;
-String savedPasswords[numPasswords] = {"6717780"}; 
+String savedPasswords[numPasswords] = {"6717780","6732608","6725006"}; 
 
 unsigned long doorOpenTime = 0; 
-const unsigned long autoCloseDelay = 3000; 
+const unsigned long autoCloseDelay = 5000; 
 // --------------------------------------------------------
 // ฟังก์ชันนี้จะทำงานเมื่อมีการพิมพ์รหัสและกดปุ่ม ENTER บนจอ
 // ฟังก์ชันควบคุมปุ่มตัวเลข
@@ -194,7 +194,7 @@ void ui_password_event_cb(lv_event_t * e)
     // -------------------------
     // ถ้ากด CLEAR
     // -------------------------
-    else if (strcmp(btnText, "CLEAR") == 0) 
+    else if (strcmp(btnText, "CLAER") == 0) 
     {
         lv_textarea_set_text(objects.enterpass, "");
         Serial.println("Password Cleared");
@@ -227,42 +227,58 @@ void ui_password_event_cb(lv_event_t * e)
         // -------------------------
         // รหัสถูก
         // -------------------------
-if (isPasswordCorrect)
-    {
-        Serial.println("UI: Password Correct!");
-
-        // 1. ล้างรหัส และ เปลี่ยนหน้าจอทันทีที่รหัสถูก
-        lv_textarea_set_text(objects.enterpass, "");
-        loadScreen(SCREEN_ID_SLIDE2);
-
-        // 2. ค่อยมาเช็คเซ็นเซอร์ว่าต้องเปิดประตูด้วยไหม
-        long distance = readDistance();
-        Serial.print("Car distance: ");
-        Serial.print(distance);
-        Serial.println(" cm");
-
-        if (true)
+// -------------------------
+        // รหัสถูก
+        // -------------------------
+        if (isPasswordCorrect)
         {
-            Serial.println("Car detected! Opening door...");
-            openDoor();
-            doorOpenTime = millis();
+            Serial.println("UI: Password Correct!");
+
+            // 1. ล้างรหัส และ เปลี่ยนหน้าจอทันทีที่รหัสถูก
+            lv_textarea_set_text(objects.enterpass, "");
+            loadScreen(SCREEN_ID_SLIDE2);
+
+            // 2. ใช้ค่าระยะทางที่อ่านไว้แล้วจากใน loop() แทนการอ่านใหม่
+            // ลบคำสั่ง long distance = readDistance(); ออก แล้วแก้เป็นบรรทัดล่างนี้:
+            long distance = globalDistance; 
+
+            Serial.print("Car distance: ");
+            Serial.print(distance);
+            Serial.println(" cm");
+
+            // 3. ตรวจสอบระยะที่ได้ (ดักค่า 0 และต้องน้อยกว่า 20 ซม.)
+            if (distance > 0 && distance < DISTANCE_THRESHOLD) 
+            // if (true)
+            {
+                Serial.println("Car detected! Opening door...");
+                openDoor();
+                doorOpenTime = millis();
+            }
+            else
+            {
+                Serial.println("No car detected! Door will NOT open.");
+            }
         }
-        else
-        {
-            Serial.println("No car detected! Door will NOT open.");
-        }
-    }
 
         // -------------------------
         // รหัสผิด
         // -------------------------
-        else
-        {
-            Serial.println("UI: Wrong Password!");
+else
+    {
+        Serial.println("UI: Wrong Password!");
 
-            // ล้างรหัสเพื่อกรอกใหม่
-            lv_textarea_set_text(objects.enterpass, "");
+        // สร้างเสียง Buzzer แบบ Manual ความถี่ 1000Hz เป็นเวลา 0.5 วินาที
+        // เพื่อไม่ให้รบกวนสัญญาณของ Servo ประตู
+        for (int i = 0; i < 500; i++) {
+            digitalWrite(buzzer, HIGH);
+            delayMicroseconds(500);
+            digitalWrite(buzzer, LOW);
+            delayMicroseconds(500);
         }
+
+        // ล้างรหัสเพื่อกรอกใหม่
+        lv_textarea_set_text(objects.enterpass, "");
+    }
       }
       }
   void ui_back_event_cb(lv_event_t * e)
@@ -276,6 +292,19 @@ if (isPasswordCorrect)
         
         // สั่งโหลดกลับไปหน้าแรก (สมมติว่าหน้าแรกชื่อ SCREEN_ID_SLIDE1)
         loadScreen(SCREEN_ID_SLIDE1); 
+    }
+}
+void ui_open_event_cb(lv_event_t * e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    if(code == LV_EVENT_CLICKED) {
+        Serial.println("UI: Open button clicked!");
+        
+        // สั่งเปิดประตู (อ้างอิงจากฟังก์ชันที่มีอยู่แล้วในระบบ)
+        openDoor(); 
+        
+        // บันทึกเวลาเริ่มต้น เพื่อให้ checkAutoClose() ใน loop() ทำงานเมื่อครบ 20 วินาที
+        doorOpenTime = millis(); 
     }
 }
 void setup()
@@ -388,6 +417,12 @@ lv_obj_add_event_cb(
     NULL
 );
   }
+  lv_obj_add_event_cb(
+    objects.openbt,         
+    ui_open_event_cb,          
+    LV_EVENT_CLICKED,          
+    NULL
+);
 }
 
 void loop()
@@ -437,7 +472,13 @@ void loop()
       lv_obj_add_flag(objects.ledgreen, LV_OBJ_FLAG_HIDDEN);    // ซ่อนไฟแดง
       lv_obj_clear_flag(objects.ledred, LV_OBJ_FLAG_HIDDEN);    // โชว์ไฟเขียว
   }
-
+  if (irValue == 0 && irValue2 == 0) {
+    digitalWrite(ledPin, LOW);  // สั่งให้ไฟดับ
+  } 
+// ถ้าช่องใดช่องหนึ่งยังว่างอยู่ หรือว่างทั้งคู่
+else {
+    digitalWrite(ledPin, HIGH); // สั่งให้ไฟติด
+  }
 #ifdef DIRECT_MODE
 #if (LV_COLOR_16_SWAP != 0)
   gfx->draw16bitBeRGBBitmap(0, 0, (uint16_t *)disp_draw_buf, screenWidth, screenHeight);
@@ -450,5 +491,5 @@ void loop()
   gfx->flush();
 #endif
 
-  delay(500);
+  delay(50);
 }
